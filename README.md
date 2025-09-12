@@ -3,11 +3,13 @@
 Repositorio listo para ejecutar en **Visual Studio Code** (o cualquier editor) y validar en **MySQL 8.0+**.
 
 **Institución:** IUDigital de Antioquia  
-**Curso:** Base de Datos
-**Código del curso:** PREICA2502B010059
-**Docente:** Julian Loaiza
-**Grupo:** 13
-**Estudiantes:** - Luis Miguel Vargas Guevara
+**Curso:** Base de Datos  
+**Código del curso:** PREICA2502B010059  
+**Docente:** Julian Loaiza  
+**Grupo:** 13  
+**Estudiantes:**
+
+- Luis Miguel Vargas Guevara
 
 ---
 
