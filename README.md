@@ -3,13 +3,18 @@
 Repositorio listo para ejecutar en **Visual Studio Code** (o cualquier editor) y validar en **MySQL 8.0+**.
 
 **Institución:** IUDigital de Antioquia  
-**Curso:** Base de Datos  
+**Curso:** Base de Datos
+**Código del curso:** PREICA2502B010059
 **Docente:** Julian Loaiza
+**Grupo:** 13
+**Estudiantes:** - Luis Miguel Vargas Guevara
 
 ---
 
 ## 🎯 Objetivo
+
 Implementar en **MySQL**:
+
 - CRUD por procedimientos almacenados para 2 tablas (`docente` y `proyecto`).
 - 1 **UDF** con operación matemática (promedio de presupuesto).
 - **Triggers** de auditoría para ACTUALIZADOS y ELIMINADOS.
@@ -17,6 +22,7 @@ Implementar en **MySQL**:
 ---
 
 ## 📂 Estructura
+
 ```
 proyectos_informaticos_mysql/
 ├─ README.md
@@ -37,7 +43,9 @@ proyectos_informaticos_mysql/
 ---
 
 ## 🚀 Ejecución rápida (MySQL Workbench o CLI)
+
 En la consola de MySQL, estando en la carpeta del proyecto:
+
 ```sql
 SOURCE sql/00_create_database.sql;
 SOURCE sql/01_schema.sql;
@@ -50,6 +58,7 @@ SOURCE sql/03_queries.sql;
 ---
 
 ## 🧩 Solución implementada
+
 - **Tablas:** `docente`, `proyecto` (1:N).
 - **Procedimientos:** `sp_docente_*`, `sp_proyecto_*`.
 - **UDF:** `fn_promedio_presupuesto_por_docente` (AVG).
@@ -59,7 +68,9 @@ SOURCE sql/03_queries.sql;
 ---
 
 ## 🌐 Landing
+
 Abrir `landing/index.html` con Live Server (VS Code) o cualquier servidor estático:
+
 ```
 cd landing
 # ejemplo con Python
@@ -70,4 +81,5 @@ python -m http.server 8080
 ---
 
 ## 📜 Licencia
+
 Uso académico.
