@@ -182,6 +182,21 @@ END$$
 
 DELIMITER ;
 
+--UDF
+DROP FUNCTION IF EXISTS fn_promedio_presupuesto_por_docente;
+CREATE FUNCTION fn_promedio_presupuesto_por_docente(p_docente_id INT)
+RETURNS DECIMAL(12,2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+  DECLARE v_prom DECIMAL(12,2);
+  SELECT IFNULL(AVG(presupuesto),0) INTO v_prom
+  FROM proyecto
+  WHERE docente_id_jefe = p_docente_id;
+  RETURN IFNULL(v_prom,0);
+END$$
+DELIMITER ;
+
 -- Triggers
 DELIMITER $$
 
