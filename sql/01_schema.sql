@@ -183,6 +183,8 @@ END$$
 DELIMITER ;
 
 --UDF
+DELIMITER $$
+
 DROP FUNCTION IF EXISTS fn_promedio_presupuesto_por_docente;
 CREATE FUNCTION fn_promedio_presupuesto_por_docente(p_docente_id INT)
 RETURNS DECIMAL(12,2)
