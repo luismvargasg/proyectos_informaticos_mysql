@@ -10,6 +10,7 @@ Repositorio listo para ejecutar en **Visual Studio Code** (o cualquier editor) y
 **Estudiantes:**
 
 - Luis Miguel Vargas Guevara
+- Julian Ricardo Gonzalez Quiroga
 
 ---
 
