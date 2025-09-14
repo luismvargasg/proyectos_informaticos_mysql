@@ -123,6 +123,8 @@ DROP PROCEDURE IF EXISTS sp_proyecto_leer;
 DROP PROCEDURE IF EXISTS sp_proyecto_actualizar;
 DROP PROCEDURE IF EXISTS sp_proyecto_eliminar;
 
+DELIMITER $$
+
 CREATE PROCEDURE sp_proyecto_crear(
   IN p_nombre           VARCHAR(120),
   IN p_descripcion      VARCHAR(400),
@@ -137,6 +139,10 @@ BEGIN
   VALUES (p_nombre, p_descripcion, p_fecha_inicial, p_fecha_final, IFNULL(p_presupuesto,0), IFNULL(p_horas,0), p_docente_id_jefe);
   SELECT LAST_INSERT_ID() AS proyecto_id_creado;
 END$$
+
+DELIMITER ;
+
+DELIMITER $$
 
 CREATE PROCEDURE sp_proyecto_leer(IN p_proyecto_id INT)
 BEGIN
@@ -174,19 +180,7 @@ BEGIN
   DELETE FROM proyecto WHERE proyecto_id = p_proyecto_id;
 END$$
 
--- UDF
-DROP FUNCTION IF EXISTS fn_promedio_presupuesto_por_docente;
-CREATE FUNCTION fn_promedio_presupuesto_por_docente(p_docente_id INT)
-RETURNS DECIMAL(12,2)
-DETERMINISTIC
-READS SQL DATA
-BEGIN
-  DECLARE v_prom DECIMAL(12,2);
-  SELECT IFNULL(AVG(presupuesto),0) INTO v_prom
-  FROM proyecto
-  WHERE docente_id_jefe = p_docente_id;
-  RETURN IFNULL(v_prom,0);
-END$$
+DELIMITER ;
 
 -- Triggers
 CREATE TRIGGER tr_docente_after_update
