@@ -183,6 +183,8 @@ END$$
 DELIMITER ;
 
 -- Triggers
+DELIMITER $$
+
 CREATE TRIGGER tr_docente_after_update
 AFTER UPDATE ON docente
 FOR EACH ROW
