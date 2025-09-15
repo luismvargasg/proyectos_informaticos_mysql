@@ -1,6 +1,6 @@
 -- schema.sql (MySQL 8.0+)
 
--- Limpieza
+-- Limpieza, con estos codigos se eliminanlas tablas y triggers si ya existen
 DROP TRIGGER IF EXISTS tr_docente_after_update;
 DROP TRIGGER IF EXISTS tr_docente_after_delete;
 
@@ -9,7 +9,7 @@ DROP TABLE IF EXISTS copia_actualizados_docente;
 DROP TABLE IF EXISTS proyecto;
 DROP TABLE IF EXISTS docente;
 
--- Tablas base
+-- Tablas base, se crean las 2 tablas principales
 CREATE TABLE docente (
   docente_id        INT AUTO_INCREMENT PRIMARY KEY,
   numero_documento  VARCHAR(20)  NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE proyecto (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
--- Auditoría
+-- Auditoría, se crean las tablas de auditoria
 CREATE TABLE copia_actualizados_docente (
   auditoria_id       INT AUTO_INCREMENT PRIMARY KEY,
   docente_id         INT NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE copia_eliminados_docente (
   usuario_sql        VARCHAR(128) NOT NULL DEFAULT (CURRENT_USER())
 ) ENGINE=InnoDB;
 
--- Procedimientos DOCENTE
+-- Procedimientos DOCENTE, se crean los procedimientos para modificar la tabala Docente
 DROP PROCEDURE IF EXISTS sp_docente_crear;
 DROP PROCEDURE IF EXISTS sp_docente_leer;
 DROP PROCEDURE IF EXISTS sp_docente_actualizar;
@@ -117,7 +117,7 @@ BEGIN
   DELETE FROM docente WHERE docente_id = p_docente_id;
 END$$
 
--- Procedimientos PROYECTO
+-- Procedimientos PROYECTO, , se crean los procedimientos para modificar la tabala Proyecto
 DROP PROCEDURE IF EXISTS sp_proyecto_crear;
 DROP PROCEDURE IF EXISTS sp_proyecto_leer;
 DROP PROCEDURE IF EXISTS sp_proyecto_actualizar;
@@ -182,7 +182,7 @@ END$$
 
 DELIMITER ;
 
---UDF
+--UDF, se crea una funcion que mustra el promedio de presupuesto para los docentes.
 
 DROP FUNCTION IF EXISTS fn_promedio_presupuesto_por_docente;
 
@@ -201,7 +201,7 @@ BEGIN
 END$$
 DELIMITER ;
 
--- Triggers
+-- Triggers, se crean los triggers que se actuvan cuando se actualiza o elimina un docente actualizando las tablas de auditoria.
 DELIMITER $$
 
 CREATE TRIGGER tr_docente_after_update
