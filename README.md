@@ -5,7 +5,7 @@ Repositorio listo para ejecutar en **Visual Studio Code** (o cualquier editor) y
 **Institución:** IUDigital de Antioquia  
 **Curso:** Base de Datos  
 **Código del curso:** PREICA2502B010059  
-**Docente:** Julian Loaiza  
+**Docente:** Julián Andrés Loaiza  
 **Grupo:** 13  
 **Estudiantes:**
 
