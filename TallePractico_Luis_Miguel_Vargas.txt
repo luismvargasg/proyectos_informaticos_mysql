@@ -1,0 +1,635 @@
+-- schema.sql (MySQL 8.0+)
+
+-- =====================================================================
+-- CREACIÓN DE BASE DE DATOS
+-- =====================================================================
+
+-- Comando para crear la base de datos llamada proyectos_informaticos si esta no existe.
+CREATE DATABASE IF NOT EXISTS proyectos_informaticos;
+USE proyectos_informaticos;
+
+-- =====================================================================
+-- CREACIÓN DE TABLAS
+-- =====================================================================
+
+-- Se crea la tabla DOCENTE con sus respectivas restricciones.
+CREATE TABLE docente (
+  docente_id        INT AUTO_INCREMENT PRIMARY KEY,
+  numero_documento  VARCHAR(20)  NOT NULL,
+  nombre            VARCHAR(120) NOT NULL,
+  direccion         VARCHAR(180),
+  titulo            VARCHAR(120),
+  anios_experiencia INT NOT NULL DEFAULT 0,
+  CONSTRAINT uq_docente_documento UNIQUE (numero_documento),
+  CONSTRAINT ck_docente_anios CHECK (anios_experiencia >= 0)
+) ENGINE=InnoDB;
+
+-- Se crea la tabla PROYECTO con sus respectivas restricciones.
+-- Se tiene en cuenta el diseño de tablas propuesto en la actividad 1, según la regla del negocio en la
+-- que un proyecto tiene un único docente asignado como jefe, se crean los campos para la asignación de
+-- las horas previstas y el coste de ese docente asignago.
+CREATE TABLE proyecto (
+  proyecto_id          INT AUTO_INCREMENT PRIMARY KEY,
+  nombre               VARCHAR(120) NOT NULL,
+  descripcion          VARCHAR(400),
+  presupuesto          DECIMAL(12,2) NOT NULL DEFAULT 0,
+  fecha_inicio         DATE NOT NULL,
+  fecha_fin            DATE,
+  jefe_horas_previstas INT NOT NULL DEFAULT 0,
+  jefe_coste           DECIMAL(15,2) NOT NULL DEFAULT 0,
+  jefe_docente_id      INT NOT NULL,
+  CONSTRAINT ck_proyecto_pres CHECK (presupuesto >= 0),
+  CONSTRAINT ck_proyecto_fechas CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio),
+  CONSTRAINT ck_proyecto_horas CHECK (jefe_horas_previstas >= 0),
+  CONSTRAINT ck_proyecto_coste CHECK (jefe_coste >= 0),
+  CONSTRAINT fk_proyecto_docente FOREIGN KEY (jefe_docente_id) REFERENCES docente(docente_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- TABLAS DE AUDITORÍA
+-- =====================================================================
+
+-- Se crea la tabla de auditoría para almacenar copias de los DOCENTES actualizados.
+-- Estas tablas permiten que se almacene un registro detallado de todos los cambios hechos en la BD.
+CREATE TABLE copia_actualizados_docente (
+  auditoria_id      INT AUTO_INCREMENT PRIMARY KEY,
+  docente_id        INT NOT NULL,
+  numero_documento  VARCHAR(20) NOT NULL,
+  nombre            VARCHAR(120) NOT NULL,
+  titulo            VARCHAR(120),
+  anios_experiencia INT NOT NULL,
+  direccion         VARCHAR(180),
+  accion_fecha      DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
+  usuario_sql       VARCHAR(128) NOT NULL DEFAULT (CURRENT_USER())
+) ENGINE=InnoDB;
+
+-- Se crea la tabla de auditoría para almacenar copias de los DOCENTES eliminados.
+CREATE TABLE copia_eliminados_docente (
+  auditoria_id      INT AUTO_INCREMENT PRIMARY KEY,
+  docente_id        INT NOT NULL,
+  numero_documento  VARCHAR(20) NOT NULL,
+  nombre            VARCHAR(120) NOT NULL,
+  titulo            VARCHAR(120),
+  anios_experiencia INT NOT NULL,
+  direccion         VARCHAR(180),
+  accion_fecha      DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
+  usuario_sql       VARCHAR(128) NOT NULL DEFAULT (CURRENT_USER())
+) ENGINE=InnoDB;
+
+-- Se crea la tabla de auditoría para almacenar copias de los PROYECTOS actualizados.
+CREATE TABLE copia_actualizados_proyecto (
+  auditoria_id        INT AUTO_INCREMENT PRIMARY KEY,
+  proyecto_id         INT NOT NULL,
+  nombre              VARCHAR(120) NOT NULL,
+  descripcion         VARCHAR(400),
+  presupuesto         DECIMAL(12,2) NOT NULL,
+  fecha_inicio        DATE NOT NULL,
+  fecha_fin           DATE,
+  jefe_horas_previstas INT NOT NULL,
+  jefe_coste          DECIMAL(15,2) NOT NULL,
+  jefe_docente_id     INT NOT NULL,
+  accion_fecha        DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
+  usuario_sql         VARCHAR(128) NOT NULL DEFAULT (CURRENT_USER())
+) ENGINE=InnoDB;
+
+-- Se crea la tabla de auditoría para almacenar copias de los PROYECTOS eliminados.
+CREATE TABLE copia_eliminados_proyecto (
+  auditoria_id        INT AUTO_INCREMENT PRIMARY KEY,
+  proyecto_id         INT NOT NULL,
+  nombre              VARCHAR(120) NOT NULL,
+  descripcion         VARCHAR(400),
+  presupuesto         DECIMAL(12,2) NOT NULL,
+  fecha_inicio        DATE NOT NULL,
+  fecha_fin           DATE,
+  jefe_horas_previstas INT NOT NULL,
+  jefe_coste          DECIMAL(15,2) NOT NULL,
+  jefe_docente_id     INT NOT NULL,
+  accion_fecha        DATETIME NOT NULL DEFAULT (UTC_TIMESTAMP()),
+  usuario_sql         VARCHAR(128) NOT NULL DEFAULT (CURRENT_USER())
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- PROCEDIMIENTOS ALMACENADOS (CRUD DOCENTE)
+-- =====================================================================
+
+-- Se cambia temporalmente el delimitador para permitir el uso de ; dentro de los procedimientos almacenados.
+-- Esto se necesita para que SQL entienda que todo esto se debe correr como un único bloque.
+DELIMITER $$
+
+-- Procedimiento para crear un nuevo DOCENTE. (CREATE)
+CREATE PROCEDURE sp_docente_create(
+  IN p_numero_documento VARCHAR(20),
+  IN p_nombre           VARCHAR(120),
+  IN p_titulo           VARCHAR(120),
+  IN p_anios_experiencia INT,
+  IN p_direccion        VARCHAR(180)
+)
+BEGIN
+  INSERT INTO docente (numero_documento, nombre, titulo, anios_experiencia, direccion)
+  VALUES (p_numero_documento, p_nombre, p_titulo, IFNULL(p_anios_experiencia,0), p_direccion);
+  SELECT LAST_INSERT_ID() AS docente_id_creado;
+END$$
+
+-- Procedimiento para consultar un DOCENTE por su ID. (READ)
+CREATE PROCEDURE sp_docente_read(IN p_docente_id INT)
+BEGIN
+  SELECT * FROM docente WHERE docente_id = p_docente_id;
+END$$
+
+-- Procedimiento para actualizar los datos de un DOCENTE. (UPDATE)
+CREATE PROCEDURE sp_docente_update(
+  IN p_docente_id       INT,
+  IN p_numero_documento VARCHAR(20),
+  IN p_nombre           VARCHAR(120),
+  IN p_titulo           VARCHAR(120),
+  IN p_anios_experiencia INT,
+  IN p_direccion        VARCHAR(180)
+)
+BEGIN
+  UPDATE docente
+     SET numero_documento = p_numero_documento,
+         nombre = p_nombre,
+         titulo = p_titulo,
+         anios_experiencia = IFNULL(p_anios_experiencia,0),
+         direccion = p_direccion
+   WHERE docente_id = p_docente_id;
+  SELECT * FROM docente WHERE docente_id = p_docente_id;
+END$$
+
+-- Procedimiento para eliminar un DOCENTE. (DELETE)
+CREATE PROCEDURE sp_docente_delete(IN p_docente_id INT)
+BEGIN
+  DELETE FROM docente WHERE docente_id = p_docente_id;
+END$$
+
+-- =====================================================================
+-- PROCEDIMIENTOS ALMACENADOS (CRUD PROYECTO)
+-- =====================================================================
+
+-- Procedimiento para crear un nuevo PROYECTO. (CREATE)
+CREATE PROCEDURE sp_proyecto_create(
+  IN p_nombre           VARCHAR(120),
+  IN p_descripcion      VARCHAR(400),
+  IN p_fecha_inicio     DATE,
+  IN p_fecha_fin        DATE,
+  IN p_presupuesto      DECIMAL(12,2),
+  IN p_horas            INT,
+  IN p_coste            DECIMAL(15,2),
+  IN p_docente_id_jefe  INT
+)
+BEGIN
+  INSERT INTO proyecto (nombre, descripcion, fecha_inicio, fecha_fin, presupuesto, jefe_horas_previstas, jefe_coste, jefe_docente_id)
+  VALUES (p_nombre, p_descripcion, p_fecha_inicio, p_fecha_fin, IFNULL(p_presupuesto,0), IFNULL(p_horas,0), IFNULL(p_coste,0), p_docente_id_jefe);
+  SELECT LAST_INSERT_ID() AS proyecto_id_creado;
+END$$
+
+-- Procedimiento para consultar un PROYECTO por su ID. (READ)
+CREATE PROCEDURE sp_proyecto_read(IN p_proyecto_id INT)
+BEGIN
+  SELECT p.*, d.nombre AS nombre_docente_jefe
+  FROM proyecto p
+  JOIN docente d ON d.docente_id = p.jefe_docente_id
+  WHERE p.proyecto_id = p_proyecto_id;
+END$$
+
+-- Procedimiento para actualizar los datos de un PROYECTO. (UPDATE)
+CREATE PROCEDURE sp_proyecto_update(
+  IN p_proyecto_id      INT,
+  IN p_nombre           VARCHAR(120),
+  IN p_descripcion      VARCHAR(400),
+  IN p_fecha_inicio     DATE,
+  IN p_fecha_fin        DATE,
+  IN p_presupuesto      DECIMAL(12,2),
+  IN p_horas            INT,
+  IN p_coste            DECIMAL(15,2),
+  IN p_docente_id_jefe  INT
+)
+BEGIN
+  UPDATE proyecto
+     SET nombre = p_nombre,
+         descripcion = p_descripcion,
+         fecha_inicio = p_fecha_inicio,
+         fecha_fin = p_fecha_fin,
+         presupuesto = IFNULL(p_presupuesto,0),
+         jefe_horas_previstas = IFNULL(p_horas,0),
+         jefe_coste = IFNULL(p_coste,0),
+         jefe_docente_id = p_docente_id_jefe
+   WHERE proyecto_id = p_proyecto_id;
+  CALL sp_proyecto_read(p_proyecto_id);
+END$$
+
+-- Procedimiento para eliminar un PROYECTO. (DELETE)
+CREATE PROCEDURE sp_proyecto_delete(IN p_proyecto_id INT)
+BEGIN
+  DELETE FROM proyecto WHERE proyecto_id = p_proyecto_id;
+END$$
+
+DELIMITER ;
+
+-- =====================================================================
+-- FUNCIÓN DEFINIDA POR EL USUARIO (UDF - User Defined Function)
+-- =====================================================================
+
+-- Se crea una función que devuelve el TOTAL de horas previstas
+-- en todos los proyectos en los que un DOCENTE es jefe.
+-- Se usa la operación matemática SUMA - SUM.
+DROP FUNCTION IF EXISTS fn_total_horas_por_docente;
+DELIMITER $$
+CREATE FUNCTION fn_total_horas_por_docente(p_docente_id INT)
+RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+  DECLARE v_total INT;
+  SELECT IFNULL(SUM(jefe_horas_previstas),0) INTO v_total
+  FROM proyecto
+  WHERE jefe_docente_id = p_docente_id;
+  RETURN v_total;
+END$$
+DELIMITER ;
+
+-- =====================================================================
+-- TRIGGERS DE AUDITORÍA (DOCENTE)
+-- =====================================================================
+DELIMITER $$
+
+-- Trigger que guarda una copia de los DOCENTES actualizados.
+CREATE TRIGGER tr_docente_after_update
+AFTER UPDATE ON docente
+FOR EACH ROW
+BEGIN
+  INSERT INTO copia_actualizados_docente
+    (docente_id, numero_documento, nombre, titulo, anios_experiencia, direccion)
+  VALUES
+    (NEW.docente_id, NEW.numero_documento, NEW.nombre, NEW.titulo, NEW.anios_experiencia, NEW.direccion);
+END$$
+
+-- Trigger que guarda una copia de los DOCENTES eliminados.
+CREATE TRIGGER tr_docente_after_delete
+AFTER DELETE ON docente
+FOR EACH ROW
+BEGIN
+  INSERT INTO copia_eliminados_docente
+    (docente_id, numero_documento, nombre, titulo, anios_experiencia, direccion)
+  VALUES
+    (OLD.docente_id, OLD.numero_documento, OLD.nombre, OLD.titulo, OLD.anios_experiencia, OLD.direccion);
+END$$
+
+-- =====================================================================
+-- TRIGGERS DE AUDITORÍA (PROYECTO)
+-- =====================================================================
+
+-- Trigger que guarda una copia de los PROYECTOS actualizados.
+CREATE TRIGGER tr_proyecto_after_update
+AFTER UPDATE ON proyecto
+FOR EACH ROW
+BEGIN
+  INSERT INTO copia_actualizados_proyecto
+    (proyecto_id, nombre, descripcion, presupuesto, fecha_inicio, fecha_fin, jefe_horas_previstas, jefe_coste, jefe_docente_id)
+  VALUES
+    (NEW.proyecto_id, NEW.nombre, NEW.descripcion, NEW.presupuesto, NEW.fecha_inicio, NEW.fecha_fin, NEW.jefe_horas_previstas, NEW.jefe_coste, NEW.jefe_docente_id);
+END$$
+
+-- Trigger que guarda una copia de los PROYECTOS eliminados.
+CREATE TRIGGER tr_proyecto_after_delete
+AFTER DELETE ON proyecto
+FOR EACH ROW
+BEGIN
+  INSERT INTO copia_eliminados_proyecto
+    (proyecto_id, nombre, descripcion, presupuesto, fecha_inicio, fecha_fin, jefe_horas_previstas, jefe_coste, jefe_docente_id)
+  VALUES
+    (OLD.proyecto_id, OLD.nombre, OLD.descripcion, OLD.presupuesto, OLD.fecha_inicio, OLD.fecha_fin, OLD.jefe_horas_previstas, OLD.jefe_coste, OLD.jefe_docente_id);
+END$$
+
+DELIMITER ;
+
+-- =====================================================================
+-- ÍNDICES DE APOYO
+-- =====================================================================
+
+-- Se crea un índice para optimizar la búsqueda de proyectos por docente jefe.
+CREATE INDEX ix_proyecto_docente ON proyecto(jefe_docente_id);
+
+-- Se crea un índice para optimizar la búsqueda de docentes por documento.
+CREATE INDEX ix_docente_documento ON docente(numero_documento);
+
+-- NOTA: Ejecutar este seed DESPUÉS de haber creado tablas, procedimientos, funciones y triggers.
+
+-- =====================================================================
+-- Creación masiva de docentes (INSERT directo)
+-- Nota: la tabla docente tiene columnas: numero_documento, nombre, titulo, anios_experiencia, direccion
+-- Nutrimos la Base de Datos para poder probar más adelante que los triggers y querys estén funcionando.
+-- =====================================================================
+INSERT INTO docente (numero_documento, nombre, titulo, anios_experiencia, direccion) VALUES
+('CC3001','Ana Pérez','MSc. Sistemas',1,'Calle 10 #1-10'),
+('CC3002','Luis Gómez','Ing. Sistemas',4,'Cra 11 #2-11'),
+('CC3003','Carla Ríos','PhD. Computación',7,'Calle 12 #3-12'),
+('CC3004','Juan Toro','MSc. Datos',10,'Cra 13 #4-13'),
+('CC3005','Marta López','Lic. Matemáticas',13,'Calle 14 #5-14'),
+('CC3006','Pedro Ramírez','MSc. Software',16,'Cra 15 #6-15'),
+('CC3007','Lucía Hernández','PhD. Educación',19,'Calle 16 #7-16'),
+('CC3008','Sergio Martínez','Esp. Analítica',22,'Cra 17 #8-17'),
+('CC3009','Elena Vargas','MSc. Estadística',25,'Calle 18 #9-18'),
+('CC3010','Andrés Castro','Ing. Electrónica',3,'Cra 19 #10-19'),
+('CC3011','Paula Suárez','MSc. Sistemas',6,'Calle 20 #1-20'),
+('CC3012','Diego Moreno','Ing. Sistemas',9,'Cra 21 #2-21'),
+('CC3013','Sofía Santos','PhD. Computación',12,'Calle 22 #3-22'),
+('CC3014','Javier León','MSc. Datos',15,'Cra 23 #4-23'),
+('CC3015','Valeria Rodríguez','Lic. Matemáticas',18,'Calle 24 #5-24'),
+('CC3016','Camilo Salazar','MSc. Software',21,'Cra 25 #6-25'),
+('CC3017','Daniela Acosta','PhD. Educación',24,'Calle 26 #7-26'),
+('CC3018','Héctor Rojas','Esp. Analítica',2,'Cra 27 #8-27'),
+('CC3019','Nadia Navarro','MSc. Estadística',5,'Calle 28 #9-28'),
+('CC3020','Felipe Campos','Ing. Electrónica',8,'Cra 29 #10-29'),
+('CC3021','Laura Méndez','MSc. Sistemas',11,'Calle 30 #1-30'),
+('CC3022','Miguel Guerrero','Ing. Sistemas',14,'Cra 31 #2-31'),
+('CC3023','Carolina Vega','PhD. Computación',17,'Calle 32 #3-32'),
+('CC3024','Tomás Lara','MSc. Datos',20,'Cra 33 #4-33'),
+('CC3025','Gabriela Romero','Lic. Matemáticas',23,'Calle 34 #5-34'),
+('CC3026','Ricardo Ibarra','MSc. Software',1,'Cra 35 #6-35'),
+('CC3027','Sara Patiño','PhD. Educación',4,'Calle 36 #7-36'),
+('CC3028','Mauricio Nieto','Esp. Analítica',7,'Cra 37 #8-37'),
+('CC3029','Isabel Cano','MSc. Estadística',10,'Calle 38 #9-38'),
+('CC3030','Oscar Fuentes','Ing. Electrónica',13,'Cra 39 #10-39'),
+('CC3031','Verónica Pineda','MSc. Sistemas',16,'Calle 40 #1-40'),
+('CC3032','Esteban Quintero','Ing. Sistemas',19,'Cra 41 #2-41'),
+('CC3033','Patricia Mejía','PhD. Computación',22,'Calle 42 #3-42'),
+('CC3034','Gustavo Gutiérrez','MSc. Datos',25,'Cra 43 #4-43'),
+('CC3035','Mariana Serrano','Lic. Matemáticas',3,'Calle 44 #5-44'),
+('CC3036','Roberto Ortega','MSc. Software',6,'Cra 45 #6-45'),
+('CC3037','Natalia Paz','PhD. Educación',9,'Calle 46 #7-46'),
+('CC3038','Iván Barrios','Esp. Analítica',12,'Cra 47 #8-47'),
+('CC3039','Claudia Miranda','MSc. Estadística',15,'Calle 48 #9-48'),
+('CC3040','Edgar Valdez','Ing. Electrónica',18,'Cra 49 #10-49'),
+('CC3041','Gloria Delgado','MSc. Sistemas',21,'Calle 50 #1-50'),
+('CC3042','Víctor Aguilar','Ing. Sistemas',24,'Cra 51 #2-51'),
+('CC3043','Diana Córdoba','PhD. Computación',2,'Calle 52 #3-52'),
+('CC3044','César Fajardo','MSc. Datos',5,'Cra 53 #4-53'),
+('CC3045','Rocío Forero','Lic. Matemáticas',8,'Calle 54 #5-54'),
+('CC3046','Julio Cárdenas','MSc. Software',11,'Cra 55 #6-55'),
+('CC3047','Noelia Blanco','PhD. Educación',14,'Calle 56 #7-56'),
+('CC3048','Emilio Bravo','Esp. Analítica',17,'Cra 57 #8-57'),
+('CC3049','Fabián Cortés','MSc. Estadística',20,'Calle 58 #9-58'),
+('CC3050','Pilar Mora','Ing. Electrónica',23,'Cra 59 #10-59');
+
+-- =====================================================================
+-- PROYECTOS 1–20
+-- Nota: la tabla proyecto tiene columnas:
+--   nombre, descripcion, fecha_inicio, fecha_fin, presupuesto,
+--   jefe_horas_previstas, jefe_coste, jefe_docente_id
+-- Por eso en cada fila añado un valor para jefe_coste (aquí fijado a 0 donde no hay info).
+-- =====================================================================
+INSERT INTO proyecto (nombre, descripcion, fecha_inicio, fecha_fin, presupuesto, jefe_horas_previstas, jefe_coste, jefe_docente_id) VALUES
+('Actualización Curricular de Ingeniería 01','Revisión y modernización de sílabos con enfoque por competencias','2023-01-15',NULL,28000.00,120,0,1),
+('Laboratorio de Robótica Educativa 02','Implementación de kits y guías para prácticas en robótica móvil','2023-01-29','2023-09-10',32000.00,140,0,2),
+('Semillero de Investigación en IA 03','Formación de estudiantes en proyectos de IA aplicada a la educación','2023-02-12',NULL,36000.00,160,0,3),
+('Acreditación de Programa 04','Preparación de evidencias y informes para acreditación nacional','2023-02-26','2023-11-20',41000.00,180,0,4),
+('Talleres de Pensamiento Computacional 05','Ciclo de talleres para escuela y pregrado con evaluación de impacto','2023-03-12',NULL,45000.00,150,0,5),
+('Repositorio de Recursos Abiertos 06','Diseño de un OER institucional con licencias abiertas','2023-03-26','2023-10-30',38000.00,140,0,6),
+('Clínica de Datos 07','Acompañamiento metodológico a proyectos de investigación estudiantil','2023-04-09',NULL,52000.00,200,0,7),
+('Evaluación de Aprendizajes 08','Diseño de rúbricas y bancos de ítems para cursos troncales','2023-04-23','2023-12-05',33000.00,120,0,8),
+('Diplomado en Analítica Educativa 09','Programa de extensión con enfoque en tablero de indicadores','2023-05-07',NULL,59000.00,220,0,9),
+('Vinculación con el Medio 10','Alianzas con colegios para proyectos de aula con tutorías','2023-05-21','2023-12-15',30000.00,110,0,10),
+('Centro de Escritura Académica 11','Creación de tutorías y materiales para redactar artículos científicos','2023-06-04',NULL,64000.00,230,0,11),
+('Aula Híbrida Piloto 12','Implementación de tecnologías para enseñanza síncrona/asincrónica','2023-06-18','2024-01-20',70000.00,260,0,12),
+('Club de Ciberseguridad 13','Formación extracurricular con retos de captura la bandera','2023-07-02',NULL,42000.00,160,0,13),
+('MOOC de Introducción a la Programación 14','Producción de curso masivo abierto con evaluación automática','2023-07-16','2024-02-15',88000.00,300,0,14),
+('Biblioteca de Casos 15','Colección de estudios de caso locales para cursos de proyectos','2023-07-30',NULL,41000.00,150,0,15),
+('Observatorio de Empleabilidad 16','Levantamiento y análisis de datos de egresados','2023-08-13','2024-03-01',62000.00,210,0,16),
+('Seminario Permanente de Investigación 17','Ciclo de charlas con investigadores invitados','2023-08-27',NULL,35000.00,140,0,17),
+('Certificación Docente Interna 18','Ruta de microcredenciales para docencia universitaria','2023-09-10','2024-03-20',54000.00,190,0,18),
+('Feria de Proyectos Integradores 19','Evento anual de exposición y evaluación por pares','2023-09-24',NULL,37000.00,130,0,19),
+('Rediseño de Laboratorios de Redes 20','Actualización de equipos y guías de prácticas','2023-10-08','2024-04-18',96000.00,320,0,20);
+
+-- =====================================================================
+-- PROYECTOS 21–40
+-- =====================================================================
+INSERT INTO proyecto (nombre, descripcion, fecha_inicio, fecha_fin, presupuesto, jefe_horas_previstas, jefe_coste, jefe_docente_id) VALUES
+('Programa de Mentorías 21','Mentoría entre egresados y estudiantes de últimos semestres','2023-10-22',NULL,42000.00,150,0,21),
+('Currículo STEM Escolar 22','Diseño de mallas curriculares STEM para colegios aliados','2023-11-05','2024-05-25',78000.00,260,0,22),
+('Archivo de Datos Abiertos 23','Publicación y catalogación de datasets académicos','2023-11-19',NULL,47000.00,170,0,23),
+('Aula Inclusiva y Accesibilidad 24','Adaptaciones de contenidos y evaluación accesible','2023-12-03','2024-06-10',52000.00,180,0,24),
+('Líneas de Investigación Institucional 25','Definición y planificación de líneas prioritarias','2023-12-17',NULL,40000.00,140,0,25),
+('Laboratorio de IoT Educativo 26','Montaje de sensores y pasarelas para proyectos de aula','2023-12-31','2024-07-05',99000.00,340,0,26),
+('Competencias Digitales Docentes 27','Capacitaciones en herramientas y buenas prácticas','2024-01-14',NULL,36000.00,130,0,27),
+('Hackatón Académica 28','Maratón de soluciones con desafíos interdisciplinarios','2024-01-28','2024-08-08',45000.00,160,0,28),
+('Semillero de Ciencia de Datos 29','Proyectos guiados con datasets institucionales','2024-02-11',NULL,68000.00,220,0,29),
+('Plan Lector Académico 30','Clubes de lectura científica y reseñas críticas','2024-02-25','2024-09-12',26000.00,100,0,30),
+('Diplomado en Docencia Universitaria 31','Formación por competencias y evaluación auténtica','2024-03-10',NULL,75000.00,240,0,31),
+('Mapa de Procesos Académicos 32','Modelado BPM de procesos de docencia e investigación','2024-03-24','2024-10-05',52000.00,180,0,32),
+('Laboratorio de Innovación Social 33','Proyectos con comunidades para transferencia de conocimiento','2024-04-07',NULL,70000.00,230,0,33),
+('Simulador de Redes 34','Desarrollo de entorno de prácticas virtuales','2024-04-21','2024-11-02',83000.00,270,0,34),
+('Titulación por Proyectos 35','Implementación de modalidad de grado basada en proyectos','2024-05-05',NULL,62000.00,210,0,35),
+('Revista Estudiantil Arbitrada 36','Lanzamiento y gestión editorial de revista indexada','2024-05-19','2024-12-03',91000.00,300,0,36),
+('Aula de Realidad Aumentada 37','Diseño de objetos de aprendizaje inmersivos','2024-06-02',NULL,84000.00,280,0,37),
+('Programa de Servicio Social 38','Prácticas académicas con impacto en la comunidad','2024-06-16','2025-01-12',56000.00,190,0,38),
+('Seminario de Ética en Investigación 39','Formación en integridad científica y buenas prácticas','2024-06-30',NULL,30000.00,110,0,39),
+('Centro de Tutorías en Cálculo 40','Apoyo intensivo para cursos de ciencias básicas','2024-07-14','2025-02-10',48000.00,170,0,40);
+
+-- =====================================================================
+-- PROYECTOS 41–60
+-- =====================================================================
+INSERT INTO proyecto (nombre, descripcion, fecha_inicio, fecha_fin, presupuesto, jefe_horas_previstas, jefe_coste, jefe_docente_id) VALUES
+('Alfabetización de Datos 41','Curso institucional de cultura y visualización de datos','2024-07-28',NULL,52000.00,180,0,41),
+('Programa de Movilidad Estudiantil 42','Convenios y becas para intercambios académicos','2024-08-11','2025-03-08',105000.00,340,0,42),
+('Observatorio de Calidad 43','Indicadores para seguimiento de resultados de aprendizaje','2024-08-25',NULL,64000.00,220,0,43),
+('Semillero de Cómputo Científico 44','Proyectos HPC para simulación y análisis numérico','2024-09-08','2025-04-05',115000.00,360,0,44),
+('Red de Laboratorios Remotos 45','Acceso remoto a equipos para prácticas de laboratorio','2024-09-22',NULL,98000.00,300,0,45),
+('Certificaciones Profesionales 46','Ruta Cisco/AWS/Oracle alineada al currículo','2024-10-06','2025-05-03',94000.00,280,0,46),
+('Observatorio de Deserción 47','Modelos predictivos y acciones de retención estudiantil','2024-10-20',NULL,72000.00,240,0,47),
+('Fondo de Semilleros 48','Financiación de proyectos estudiantiles competitivos','2024-11-03','2025-05-31',88000.00,290,0,48),
+('Ecosistema de Mentoría Femenina 49','Impulso a vocaciones STEM en mujeres','2024-11-17',NULL,46000.00,160,0,49),
+('Programa de Internacionalización 50','Estrategia de dobles titulaciones y publicaciones conjuntas','2024-12-01','2025-06-19',132000.00,380,0,50),
+('Clúster de Computación 51','Adquisición y puesta a punto de clúster académico','2025-01-12',NULL,200000.00,520,0,10),
+('Iniciativa de Aprendizaje Servicio 52','Integración de proyectos con necesidades del entorno','2025-01-26',NULL,57000.00,190,0,5),
+('Cátedra de Emprendimiento 53','Ecosistema de innovación y prototipado rápido','2025-02-09','2025-08-25',76000.00,250,0,18),
+('Laboratorio de Fabricación Digital 54','Implementación de impresoras 3D y corte láser','2025-02-23',NULL,112000.00,340,0,22),
+('Aula Verde 55','Proyectos de sostenibilidad y eficiencia energética','2025-03-09','2025-09-30',68000.00,220,0,31),
+('Programa de Bilingüismo Académico 56','Fortalecimiento de lectura y escritura en inglés técnico','2025-03-23',NULL,49000.00,170,0,7),
+('Repositorio de Tesis y Datos 57','Plataforma de preservación y citación de investigaciones','2025-04-06','2025-10-28',74000.00,240,0,14),
+('Ciclo de Seminarios de Frontera 58','Invitados internacionales en áreas emergentes','2025-04-20',NULL,53000.00,180,0,28),
+('Aula de Computación en la Nube 59','Laboratorios con cuentas educativas y sandbox seguro','2025-05-04','2025-11-16',99000.00,300,0,33),
+('Centro de Innovación Pedagógica 60','I+D en metodologías activas y evaluación auténtica','2025-05-18',NULL,120000.00,320,0,40);
+
+-- =====================================================================
+-- Docentes (CREATE) - usar el procedimiento sp_docente_create definido en el esquema
+-- =====================================================================
+CALL sp_docente_create('CC1001', 'Ana Gómez', 'MSc. Ing. Sistemas', 6, 'Cra 10 # 5-55');
+CALL sp_docente_create('CC1002', 'Carlos Ruiz', 'Ing. Informático', 3, 'Cll 20 # 4-10');
+
+-- Obtener IDs, se asignan ID a los 2 usuarios insertados
+SET @id_ana    := (SELECT docente_id FROM docente WHERE numero_documento='CC1001');
+SET @id_carlos := (SELECT docente_id FROM docente WHERE numero_documento='CC1002');
+
+-- =====================================================================
+-- Proyectos (CREATE) - usar el procedimiento sp_proyecto_create definido en el esquema
+-- Nota: sp_proyecto_create espera (p_nombre, p_descripcion, p_fecha_inicio, p_fecha_fin,
+--       p_presupuesto, p_horas, p_coste, p_docente_id_jefe)
+-- Por eso incluyo un valor para coste (0 cuando no se especifica).
+-- =====================================================================
+CALL sp_proyecto_create('Plataforma Académica', 'Módulos de matrícula', '2025-01-01', NULL, 25000000, 800, 0, @id_ana);
+CALL sp_proyecto_create('Chat Soporte TI', 'Chat universitario', '2025-02-01', '2025-06-30', 12000000, 450, 0, @id_carlos);
+
+-- =====================================================================
+-- UPDATE para disparar trigger de ACTUALIZADOS (usar sp_docente_update)
+-- =====================================================================
+CALL sp_docente_update(@id_carlos, 'CC1002', 'Carlos A. Ruiz', 'Esp. Base de Datos', 4, 'Cll 20 # 4-10');
+
+-- =====================================================================
+-- Eliminar la docente Ana: primero eliminamos sus proyectos por FK, luego al docente
+-- =====================================================================
+DELETE FROM proyecto WHERE jefe_docente_id = @id_ana;
+CALL sp_docente_delete(@id_ana);
+
+-- =====================================================================
+-- Acciones Adicionales para Generar Registros de Auditoría
+-- =====================================================================
+
+-- Actualiza datos de un docente para disparar el trigger de actualización.
+-- (Este es el docente con ID 1 en la base de datos)
+CALL sp_docente_update(1, 'CC3001', 'Ana María Pérez', 'MSc. Sistemas de Información', 2, 'Calle 10 #1-10');
+
+-- Actualiza los años de experiencia de otro docente.
+-- (Este es el docente con ID 2 en la base de datos)
+CALL sp_docente_update(2, 'CC3002', 'Luis E. Gómez', 'Ing. Sistemas y Computación', 5, 'Cra 11 #2-11');
+
+-- Actualiza el nombre y descripción de un proyecto.
+-- (Este es el proyecto con ID 1 en la base de datos)
+CALL sp_proyecto_update(1, 'Actualización Curricular de Ingeniería 2.0', 'Revisión y modernización de sílabos con enfoque en IA', '2023-01-15', NULL, 35000.00, 150, 0, 1);
+
+-- Generar registros de eliminación de forma segura.
+-- Elimina un proyecto para registrarlo en la tabla de auditoría.
+-- Este proyecto (ID 2) no tiene dependientes, por lo que la eliminación es directa.
+DELETE FROM proyecto WHERE proyecto_id = 2;
+
+-- Para eliminar al docente con ID 3, primero se debe eliminar su proyecto asociado (ID 3).
+DELETE FROM proyecto WHERE jefe_docente_id = 3;
+CALL sp_docente_delete(3);
+
+-- Opcional: Elimina otro par para generar más datos de auditoría.
+-- El docente con ID 4 está asociado al proyecto con ID 4.
+DELETE FROM proyecto WHERE jefe_docente_id = 4;
+CALL sp_docente_delete(4);
+
+-- =====================================================================
+-- Los siguientes queries están diseñados para ser ejecutados después de
+-- haber cargado completamente los scripts de 'schema.sql' y 'seed.sql'.
+-- =====================================================================
+
+-- Q0: Usa la base de datos 'proyectos_informaticos' para todas las operaciones.
+USE proyectos_informaticos;
+
+-- Q1: Lista todos los proyectos y el nombre del docente que los lidera.
+-- Esta consulta une la información de la tabla 'proyecto' con la de 'docente'
+-- para mostrar el nombre del proyecto junto con el nombre del docente_jefe.
+SELECT
+    p.proyecto_id,
+    p.nombre AS proyecto,
+    d.nombre AS docente_jefe
+FROM
+    proyecto p
+JOIN
+    docente d ON d.docente_id = p.jefe_docente_id;
+
+-- Q2: Obtiene el total de horas de proyectos para cada docente.
+-- Esta consulta utiliza la función definida por el usuario 'fn_total_horas_por_docente'
+-- para calcular y mostrar el total de horas asignadas a proyectos por cada docente.
+SELECT
+    d.docente_id,
+    d.nombre,
+    fn_total_horas_por_docente(d.docente_id) AS total_horas
+FROM
+    docente d;
+
+-- Q3: Muestra las últimas 10 entradas en la tabla de auditoría para docentes actualizados.
+-- Esta consulta permite verificar que el trigger 'tr_docente_after_update' está
+-- funcionando correctamente, registrando las modificaciones de los docentes.
+SELECT
+    *
+FROM
+    copia_actualizados_docente
+ORDER BY
+    auditoria_id DESC
+LIMIT 10;
+
+-- Q4: Muestra las últimas 10 entradas en la tabla de auditoría para docentes eliminados.
+-- Esta consulta verifica el funcionamiento del trigger 'tr_docente_after_delete',
+-- mostrando una copia de los docentes que han sido eliminados del sistema.
+SELECT
+    *
+FROM
+    copia_eliminados_docente
+ORDER BY
+    auditoria_id DESC
+LIMIT 10;
+
+-- Q5: Valida que los datos de los proyectos cumplan con las restricciones 'CHECK'.
+-- Esta consulta selecciona solo los proyectos donde las fechas, el presupuesto
+-- y las horas previstas cumplen con las reglas de validación definidas en el esquema.
+SELECT
+    proyecto_id,
+    nombre,
+    fecha_inicio,
+    fecha_fin,
+    presupuesto,
+    jefe_horas_previstas
+FROM
+    proyecto
+WHERE
+    (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
+AND
+    presupuesto >= 0
+AND
+    jefe_horas_previstas >= 0;
+
+-- Q6: Lista cada docente con todos los proyectos que lidera.
+-- Esta consulta usa un LEFT JOIN para incluir a todos los docentes, incluso
+-- aquellos que no tienen proyectos asignados, mostrando su ID y nombre junto
+-- con los proyectos asociados (si los hay).
+SELECT
+    d.docente_id,
+    d.nombre,
+    p.proyecto_id,
+    p.nombre AS proyecto_nombre
+FROM
+    docente d
+LEFT JOIN
+    proyecto p ON d.docente_id = p.jefe_docente_id
+ORDER BY
+    d.docente_id;
+
+-- Q7: Calcula el total de horas de todos los proyectos para cada docente.
+-- Esta consulta agrupa los proyectos por docente y suma las horas previstas
+-- de cada uno, proporcionando un resumen del total de horas trabajadas por cada líder de proyecto.
+SELECT
+    d.docente_id,
+    d.nombre,
+    SUM(p.jefe_horas_previstas) AS total_horas
+FROM
+    docente d
+LEFT JOIN
+    proyecto p ON d.docente_id = p.jefe_docente_id
+GROUP BY
+    d.docente_id,
+    d.nombre;
+
+-- Q8: Inserta nuevos docentes y proyectos usando procedimientos almacenados.
+-- Este bloque de código demuestra cómo usar los procedimientos 'sp_docente_create'
+-- y 'sp_proyecto_create' para agregar nuevos registros de manera segura y controlada,
+-- respetando la lógica de negocio de la base de datos.
+SET @id_ana     := (SELECT docente_id FROM docente WHERE numero_documento='CC3001');
+SET @id_carlos  := (SELECT docente_id FROM docente WHERE numero_documento='CC1002');
+CALL sp_proyecto_create('Plataforma Académica', 'Módulos de matrícula', '2025-01-01', NULL, 25000000, 800, 0, @id_ana);
+CALL sp_proyecto_create('Chat Soporte TI', 'Chat universitario', '2025-02-01', '2025-06-30', 12000000, 450, 0, @id_carlos);
+
+-- Q9: Inserta un nuevo docente y un proyecto directamente en las tablas.
+-- Este bloque es una alternativa a los procedimientos almacenados, insertando
+-- registros directamente en las tablas 'docente' y 'proyecto'. Muestra cómo
+-- se puede usar una subconsulta para obtener el ID del docente para el proyecto.
+INSERT INTO docente (numero_documento, nombre, titulo, anios_experiencia, direccion)
+VALUES ('CC2001','María López','Esp. Gestión de Proyectos',7,'Av. Siempre Viva 742');
+INSERT INTO proyecto (nombre, descripcion, fecha_inicio, fecha_fin, presupuesto, jefe_horas_previstas, jefe_coste, jefe_docente_id)
+VALUES ('App Biblioteca','App móvil de préstamos','2025-03-01',NULL, 9000000, 320, 0,
+    (SELECT docente_id FROM docente WHERE numero_documento='CC2001'));
+
