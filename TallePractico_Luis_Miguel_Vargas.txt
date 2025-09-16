@@ -633,3 +633,44 @@ INSERT INTO proyecto (nombre, descripcion, fecha_inicio, fecha_fin, presupuesto,
 VALUES ('App Biblioteca','App móvil de préstamos','2025-03-01',NULL, 9000000, 320, 0,
     (SELECT docente_id FROM docente WHERE numero_documento='CC2001'));
 
+-- =====================================================================
+-- DOCUMENTACIÓN: RESOLUCIÓN DE PROBLEMAS
+-- =====================================================================
+-- En el desarrollo del caso de estudio se identificaron los siguientes
+-- problemas potenciales al usar funciones, procedimientos y triggers,
+-- junto con sus soluciones implementadas:
+
+-- 1. Eliminación de docentes con proyectos asociados
+--    Problema: Si se intenta eliminar un docente que aún tiene proyectos
+--    asignados, se genera un error de restricción de clave foránea.
+--    Solución: Antes de eliminar el docente, se eliminan manualmente sus
+--    proyectos asociados (DELETE en tabla proyecto) y luego se ejecuta
+--    el procedimiento sp_docente_delete.
+
+-- 2. Inserción o actualización de datos inválidos
+--    Problema: Riesgo de guardar presupuestos negativos, fechas finales
+--    anteriores a la fecha de inicio, o horas previstas menores a cero.
+--    Solución: Se implementaron restricciones CHECK en la tabla proyecto
+--    y docente, garantizando que los valores siempre cumplan las reglas
+--    de negocio definidas.
+
+-- 3. Pérdida de trazabilidad en cambios y eliminaciones
+--    Problema: Al modificar o eliminar registros se pierde el histórico
+--    de datos, lo cual impide auditoría y seguimiento.
+--    Solución: Se crearon triggers AFTER UPDATE y AFTER DELETE para
+--    DOCENTE y PROYECTO, que almacenan copias en tablas de auditoría.
+
+-- 4. Consultas lentas en tablas grandes
+--    Problema: Con el crecimiento de los datos, las búsquedas frecuentes
+--    (por número de documento o docente jefe) pueden ser lentas.
+--    Solución: Se añadieron índices en las columnas clave (docente.numero_documento,
+--    proyecto.jefe_docente_id) para optimizar la velocidad de consulta.
+
+-- 5. Cálculo manual de métricas repetitivas
+--    Problema: Consultar una y otra vez el total de horas por docente
+--    requería repetir lógica en varias consultas.
+--    Solución: Se creó la función fn_total_horas_por_docente para centralizar
+--    el cálculo y simplificar el uso en queries y reportes.
+
+-- Con estas medidas se resolvieron los principales problemas de integridad,
+-- consistencia, trazabilidad y eficiencia en el caso de estudio.
