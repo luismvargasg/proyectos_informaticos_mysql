@@ -1,25 +1,25 @@
 -- seed.sql (MySQL 8.0+)
 
--- Docentes (CREATE)
+-- Docentes (CREATE), se ingresan 2 usuarios usando la funcion crear
 CALL sp_docente_crear('CC1001', 'Ana Gómez', 'MSc. Ing. Sistemas', 6, 'Cra 10 # 5-55', 'Tiempo completo');
 CALL sp_docente_crear('CC1002', 'Carlos Ruiz', 'Ing. Informático', 3, 'Cll 20 # 4-10', 'Cátedra');
 
--- Obtener IDs
+-- Obtener IDs, se asignas ID a los 2 usuarios ingresados
 SET @id_ana    := (SELECT docente_id FROM docente WHERE numero_documento='CC1001');
 SET @id_carlos := (SELECT docente_id FROM docente WHERE numero_documento='CC1002');
 
--- Proyectos (CREATE)
+-- Proyectos (CREATE), se ingresan 2 proyectos usando la funcion crear
 CALL sp_proyecto_crear('Plataforma Académica', 'Módulos de matrícula', '2025-01-01', NULL, 25000000, 800, @id_ana);
 CALL sp_proyecto_crear('Chat Soporte TI', 'Chat universitario', '2025-02-01', '2025-06-30', 12000000, 450, @id_carlos);
 
--- UPDATE para disparar trigger de ACTUALIZADOS
+-- UPDATE para disparar trigger de ACTUALIZADOS, se actualiza el usuario carlos utilizando la funcion actualizaar y activando el trigger para enviar a la tabla actualizados
 CALL sp_docente_actualizar(@id_carlos, 'CC1002', 'Carlos A. Ruiz', 'Esp. Base de Datos', 4, 'Cll 20 # 4-10', 'Cátedra');
 
--- Eliminar la docente Ana: primero sus proyectos (por FK), luego docente (dispara DELETE)
+-- Eliminar la docente Ana: primero sus proyectos (por FK), luego docente (dispara DELETE), se eliminan los proy4ectos que tienen como docente a ana y liego se llama a la funcion eliminar para activar el triiger y actualizar la tabla de eliminados.
 DELETE FROM proyecto WHERE docente_id_jefe = @id_ana;
 CALL sp_docente_eliminar(@id_ana);
 
--- Creación de docentes para realizar pruebas
+-- Creación de docentes para realizar pruebas, se agregan multiples valores a la tabla docente
 INSERT INTO docente (numero_documento, nombres, titulo, anios_experiencia, direccion, tipo_docente) VALUES
 ('CC3001','Ana Pérez','MSc. Sistemas',1,'Calle 10 #1-10','Planta'),
 ('CC3002','Luis Gómez','Ing. Sistemas',4,'Cra 11 #2-11','Catedra'),
@@ -73,7 +73,7 @@ INSERT INTO docente (numero_documento, nombres, titulo, anios_experiencia, direc
 ('CC3050','Pilar Mora','Ing. Electrónica',23,'Cra 59 #10-59','Catedra');
 
 
--- PROYECTOS 1–20
+-- PROYECTOS 1–20 se agregan varios valores a la tabla PROYECTO
 INSERT INTO proyecto (nombre, descripcion, fecha_inicial, fecha_final, presupuesto, horas, docente_id_jefe) VALUES
 ('Actualización Curricular de Ingeniería 01','Revisión y modernización de sílabos con enfoque por competencias','2023-01-15',NULL,28000.00,120,1),
 ('Laboratorio de Robótica Educativa 02','Implementación de kits y guías para prácticas en robótica móvil','2023-01-29','2023-09-10',32000.00,140,2),
